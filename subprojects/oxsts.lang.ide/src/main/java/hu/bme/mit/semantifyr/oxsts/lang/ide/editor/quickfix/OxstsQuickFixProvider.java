@@ -29,4 +29,9 @@ public class OxstsQuickFixProvider extends AbstractDeclarativeIdeQuickfixProvide
         }));
     }
 
+    // TODO: add quick fixes
+    //  - constant expression could be simplified -> replace with evaluation
+    //   - will need ConstantExpressionEvaluator and ConstantExpressionEvaluatorTransformer
+    //  - guard of 'if' is static -> could be inline if (same with for)
+
 }

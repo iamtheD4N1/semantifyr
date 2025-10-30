@@ -12,6 +12,8 @@ import hu.bme.mit.semantifyr.oxsts.lang.naming.NamingUtil;
 import hu.bme.mit.semantifyr.oxsts.model.oxsts.*;
 import org.eclipse.emf.ecore.EObject;
 import org.eclipse.xtext.resource.ILocationInFileProvider;
+import hu.bme.mit.semantifyr.oxsts.lang.semantics.typesystem.ExpressionTypeEvaluatorProvider;
+import org.eclipse.emf.common.util.Diagnostic;
 import org.eclipse.xtext.validation.Check;
 
 import java.util.LinkedHashMap;
@@ -35,6 +37,31 @@ public class OxstsValidator extends AbstractOxstsValidator {
 
     @Inject
     protected BuiltinSymbolResolver builtinSymbolResolver;
+
+    @Inject
+    private ExpressionTypeEvaluatorProvider expressionTypeEvaluatorProvider;
+
+    @Check
+    public void checkTypes(OxstsModelPackage oxstsModelPackage) {
+        var evaluator = expressionTypeEvaluatorProvider.getEvaluator(oxstsModelPackage);
+        var diagnostics = evaluator.checkTypes(oxstsModelPackage);
+
+        for (var diagnostic : diagnostics) {
+            switch (diagnostic.getSeverity()) {
+                case Diagnostic.INFO -> info(diagnostic.getMessage(), diagnostic.getSourceEObject(),
+                        diagnostic.getFeature(), diagnostic.getIndex(), diagnostic.getIssueCode(),
+                        diagnostic.getIssueData());
+                case Diagnostic.WARNING -> warning(diagnostic.getMessage(), diagnostic.getSourceEObject(),
+                        diagnostic.getFeature(), diagnostic.getIndex(), diagnostic.getIssueCode(),
+                        diagnostic.getIssueData());
+                case Diagnostic.ERROR -> error(diagnostic.getMessage(), diagnostic.getSourceEObject(),
+                        diagnostic.getFeature(), diagnostic.getIndex(), diagnostic.getIssueCode(),
+                        diagnostic.getIssueData());
+                default -> throw new IllegalStateException("Unknown severity %s of %s"
+                        .formatted(diagnostic.getSeverity(), diagnostic));
+            }
+        }
+    }
 
     @Override
     protected void handleExceptionDuringValidation(Throwable targetException) throws RuntimeException {
