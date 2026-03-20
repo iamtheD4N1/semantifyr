@@ -9,6 +9,7 @@ package hu.bme.mit.semantifyr.oxsts.lang.validation;
 import com.google.inject.Inject;
 import hu.bme.mit.semantifyr.oxsts.lang.library.builtin.BuiltinSymbolResolver;
 import hu.bme.mit.semantifyr.oxsts.lang.naming.NamingUtil;
+import hu.bme.mit.semantifyr.oxsts.lang.semantics.typesystem.ExpressionModalityEvaluatorProvider;
 import hu.bme.mit.semantifyr.oxsts.model.oxsts.*;
 import org.eclipse.emf.ecore.EObject;
 import org.eclipse.xtext.resource.ILocationInFileProvider;
@@ -40,6 +41,9 @@ public class OxstsValidator extends AbstractOxstsValidator {
 
     @Inject
     private ExpressionTypeEvaluatorProvider expressionTypeEvaluatorProvider;
+
+    @Inject
+    private ExpressionModalityEvaluatorProvider expressionModalityEvaluatorProvider;
 
     @Check
     public void checkTypes(OxstsModelPackage oxstsModelPackage) {
@@ -124,6 +128,24 @@ public class OxstsValidator extends AbstractOxstsValidator {
     protected void acceptError(String message, EObject object, String code, String... issueData) {
         var region = locationInFileProvider.getFullTextRegion(object);
         acceptError(message, object, region.getOffset(), region.getLength(), code, issueData);
+    }
+
+    @Check
+    public void ifOperationGuardMustBeBool(IfOperation ifOperation) {
+        var evaluation = expressionTypeEvaluatorProvider.evaluate(ifOperation.getGuard());
+
+        if (evaluation.getDomain() != builtinSymbolResolver.boolDatatype(ifOperation)) {
+            acceptError("message", ifOperation, OxstsPackage.Literals.IF_OPERATION__GUARD, 0, DUPLICATE_NAME_ISSUE);
+        }
+    }
+
+    @Check
+    public void ifOperationGuardMustBeBool(InlineIfOperation inlineIfOperation) {
+        var evaluation = expressionTypeEvaluatorProvider.evaluate(inlineIfOperation.getGuard());
+
+        if (evaluation.getDomain() != builtinSymbolResolver.boolDatatype(inlineIfOperation)) {
+            acceptError("message", inlineIfOperation, OxstsPackage.Literals.INLINE_IF_OPERATION__GUARD, 0, DUPLICATE_NAME_ISSUE);
+        }
     }
 
 }

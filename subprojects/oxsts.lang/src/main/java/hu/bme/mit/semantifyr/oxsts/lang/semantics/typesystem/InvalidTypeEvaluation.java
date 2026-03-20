@@ -6,4 +6,10 @@
 
 package hu.bme.mit.semantifyr.oxsts.lang.semantics.typesystem;
 
-public final class InvalidTypeEvaluation implements TypeEvaluation {}
+public final class InvalidTypeEvaluation implements TypeEvaluation {
+
+    public static final InvalidTypeEvaluation INSTANCE = new InvalidTypeEvaluation();
+
+    private InvalidTypeEvaluation() {}
+
+}

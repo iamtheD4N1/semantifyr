@@ -48,7 +48,7 @@ public class VariableTypeEvaluator {
             return expressionTypeEvaluatorProvider.evaluate(abstractForOperation.getRangeExpression());
         }
 
-        return TypeEvaluation.INVALID;
+        return InvalidTypeEvaluation.INSTANCE;
     }
 
 }

@@ -8,8 +8,19 @@ package hu.bme.mit.semantifyr.oxsts.lang.semantics.typesystem;
 
 import hu.bme.mit.semantifyr.oxsts.lang.semantics.expression.ExpressionEvaluator;
 import hu.bme.mit.semantifyr.oxsts.model.oxsts.*;
+import org.eclipse.emf.common.util.Diagnostic;
+import org.eclipse.xtext.EcoreUtil2;
+import org.eclipse.xtext.validation.Check;
+import org.eclipse.xtext.validation.CheckType;
+import org.eclipse.xtext.validation.FeatureBasedDiagnostic;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class ExpressionModalityEvaluator extends ExpressionEvaluator<Modality> {
+    private final List<FeatureBasedDiagnostic> diagnosticList = new ArrayList<>();
+
+    private static final String INCORRECT_MODALITY_ERROR = "INCORRECT_MODALITY";
 
     @Override
     protected Modality visit(RangeExpression expression) {
@@ -111,5 +122,97 @@ public class ExpressionModalityEvaluator extends ExpressionEvaluator<Modality> {
     @Override
     protected Modality visit(IndexingSuffixExpression expression) {
         return evaluate(expression.getPrimary()).combine(evaluate(expression.getIndex()));
+    }
+
+    public List<FeatureBasedDiagnostic> checkModalities(OxstsModelPackage oxstsModelPackage) {
+
+        var inlineIfs = EcoreUtil2.eAllOfType(oxstsModelPackage, InlineIfOperation.class);
+        var inlineFors = EcoreUtil2.eAllOfType(oxstsModelPackage, InlineForOperation.class);
+        var varDeclarations = EcoreUtil2.eAllOfType(oxstsModelPackage, VariableDeclaration.class);
+        var featureDeclarations = EcoreUtil2.eAllOfType(oxstsModelPackage, FeatureDeclaration.class);
+
+        for (var inlineIf : inlineIfs) {
+            check(inlineIf);
+        }
+        for (var inlineFor : inlineFors) {
+            check(inlineFor);
+        }
+        for (var varDeclaration : varDeclarations) {
+            check(varDeclaration);
+        }
+        for (var featureDeclaration : featureDeclarations) {
+            check(featureDeclaration);
+        }
+
+        return diagnosticList;
+    }
+
+    @Check
+    protected Modality check(InlineIfOperation expression) {
+        if (visit(expression.getGuard()) == Modality.Dynamic) {
+            diagnosticList.add(new FeatureBasedDiagnostic(
+                    Diagnostic.ERROR,
+                    "Inline if guard required to be at least static!",
+                    expression,
+                    null,
+                    0,
+                    CheckType.EXPENSIVE,
+                    INCORRECT_MODALITY_ERROR
+            ));
+        }
+
+        return Modality.Static;
+    }
+
+    @Check
+    protected Modality check(InlineForOperation expression) {
+        if (visit(expression.getRangeExpression()) == Modality.Dynamic) {
+            diagnosticList.add(new FeatureBasedDiagnostic(
+                    Diagnostic.ERROR,
+                    "Inline for range required to be at least static!",
+                    expression,
+                    null,
+                    0,
+                    CheckType.EXPENSIVE,
+                    INCORRECT_MODALITY_ERROR
+            ));
+        }
+
+        return Modality.Static;
+    }
+
+    // not sure of this
+    @Check
+    protected Modality check(VariableDeclaration expression) {
+        if (visit(expression.getExpression()) == Modality.Dynamic) {
+            diagnosticList.add(new FeatureBasedDiagnostic(
+                    Diagnostic.ERROR,
+                    "Variable declaration value required to be at least static!",
+                    expression,
+                    null,
+                    0,
+                    CheckType.EXPENSIVE,
+                    INCORRECT_MODALITY_ERROR
+            ));
+        }
+
+        return Modality.Static;
+    }
+
+    @Check
+    protected Modality check(FeatureDeclaration expression) {
+        if (visit(expression.getExpression()) == Modality.Dynamic) {
+            diagnosticList.add(new FeatureBasedDiagnostic(
+                    Diagnostic.ERROR,
+                    "Feature declaration value required to be at least static!",
+                    expression,
+                    null,
+                    0,
+                    CheckType.EXPENSIVE,
+                    INCORRECT_MODALITY_ERROR
+            ));
+        }
+
+        return Modality.Static;
     }
 }

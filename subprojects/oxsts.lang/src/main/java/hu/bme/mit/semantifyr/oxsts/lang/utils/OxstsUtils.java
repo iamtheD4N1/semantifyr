@@ -85,4 +85,14 @@ public class OxstsUtils {
         return argument.getExpression();
     }
 
+    public static boolean isLoopVariable(EObject element) {
+        var container = element.eContainer();
+
+        if (container instanceof AbstractForOperation forOperation) {
+            return forOperation.getLoopVariable() == element;
+        }
+
+        return false;
+    }
+
 }

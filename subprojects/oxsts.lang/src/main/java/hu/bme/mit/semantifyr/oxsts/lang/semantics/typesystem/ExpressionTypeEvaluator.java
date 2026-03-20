@@ -10,7 +10,9 @@ import com.google.inject.Inject;
 import hu.bme.mit.semantifyr.oxsts.lang.library.builtin.BuiltinSymbolResolver;
 import hu.bme.mit.semantifyr.oxsts.lang.semantics.expression.ExpressionEvaluator;
 import hu.bme.mit.semantifyr.oxsts.model.oxsts.*;
+import org.eclipse.emf.common.util.Diagnostic;
 import org.eclipse.xtext.EcoreUtil2;
+import org.eclipse.xtext.validation.CheckType;
 import org.eclipse.xtext.validation.FeatureBasedDiagnostic;
 
 import java.util.ArrayList;
@@ -26,7 +28,7 @@ public class ExpressionTypeEvaluator extends ExpressionEvaluator<TypeEvaluation>
 
     @Override
     protected TypeEvaluation visit(RangeExpression expression) {
-        return TypeEvaluation.INVALID;
+        return InvalidTypeEvaluation.INSTANCE;
     }
 
 
@@ -166,10 +168,10 @@ public class ExpressionTypeEvaluator extends ExpressionEvaluator<TypeEvaluation>
         var right = evaluate(expression.getRight());
 
         if (left instanceof InvalidTypeEvaluation) {
-            return TypeEvaluation.INVALID;
+            return InvalidTypeEvaluation.INSTANCE;
         }
         if (right instanceof InvalidTypeEvaluation) {
-            return TypeEvaluation.INVALID;
+            return InvalidTypeEvaluation.INSTANCE;
         }
         if (
             left instanceof ImmutableTypeEvaluation(DomainDeclaration leftdomain)
@@ -182,37 +184,152 @@ public class ExpressionTypeEvaluator extends ExpressionEvaluator<TypeEvaluation>
                 return new ImmutableTypeEvaluation(builtinSymbolResolver.boolDatatype(expression));
             }
         }
-        return TypeEvaluation.INVALID;
+        diagnosticList.add(new FeatureBasedDiagnostic(
+                Diagnostic.ERROR,
+                "Unknown type",
+                expression,
+                null,
+                0,
+                CheckType.EXPENSIVE,
+                INCORRECT_TYPE_ERROR
+        ));
+        return InvalidTypeEvaluation.INSTANCE;
     }
 
     @Override
     protected TypeEvaluation visit(ArithmeticBinaryOperator expression) {
-        return TypeEvaluation.INVALID;
+        var left = evaluate(expression.getLeft());
+        var right = evaluate(expression.getRight());
+
+        if (left instanceof InvalidTypeEvaluation) {
+            return InvalidTypeEvaluation.INSTANCE;
+        }
+        if (right instanceof InvalidTypeEvaluation) {
+            return InvalidTypeEvaluation.INSTANCE;
+        }
+        if (
+            left instanceof ImmutableTypeEvaluation(DomainDeclaration leftdomain)
+            && right instanceof ImmutableTypeEvaluation(DomainDeclaration rightdomain)
+        ) {
+            if(
+                leftdomain == builtinSymbolResolver.intDatatype(expression)
+                && rightdomain == builtinSymbolResolver.intDatatype(expression)
+            ) {
+                return new ImmutableTypeEvaluation(builtinSymbolResolver.intDatatype(expression));
+            }
+        }
+        diagnosticList.add(new FeatureBasedDiagnostic(
+                Diagnostic.ERROR,
+                "Unknown type",
+                expression,
+                null,
+                0,
+                CheckType.EXPENSIVE,
+                INCORRECT_TYPE_ERROR
+        ));
+        return InvalidTypeEvaluation.INSTANCE;
     }
 
     @Override
     protected TypeEvaluation visit(BooleanOperator expression) {
-        return TypeEvaluation.INVALID;
+        var left = evaluate(expression.getLeft());
+        var right = evaluate(expression.getRight());
+
+        // isBinaryOperatorLegal(expression.getOp(), left, right);
+
+        if (left instanceof InvalidTypeEvaluation) {
+            return InvalidTypeEvaluation.INSTANCE;
+        }
+        if (right instanceof InvalidTypeEvaluation) {
+            return InvalidTypeEvaluation.INSTANCE;
+        }
+        if (
+            left instanceof ImmutableTypeEvaluation(DomainDeclaration leftdomain)
+            && right instanceof ImmutableTypeEvaluation(DomainDeclaration rightdomain)
+        ) {
+            if(
+                leftdomain == builtinSymbolResolver.boolDatatype(expression)
+                && rightdomain == builtinSymbolResolver.boolDatatype(expression)
+            ) {
+                return new ImmutableTypeEvaluation(builtinSymbolResolver.boolDatatype(expression));
+            }
+        }
+        diagnosticList.add(new FeatureBasedDiagnostic(
+                Diagnostic.ERROR,
+                "Unknown type",
+                expression,
+                null,
+                0,
+                CheckType.EXPENSIVE,
+                INCORRECT_TYPE_ERROR
+        ));
+        return InvalidTypeEvaluation.INSTANCE;
     }
 
     @Override
     protected TypeEvaluation visit(ArithmeticUnaryOperator expression) {
-        return TypeEvaluation.INVALID;
+        var body = evaluate(expression.getBody());
+
+        if (body instanceof InvalidTypeEvaluation) {
+            return InvalidTypeEvaluation.INSTANCE;
+        }
+        if (
+            body instanceof ImmutableTypeEvaluation(DomainDeclaration bodydomain)
+        ) {
+            if(
+                bodydomain == builtinSymbolResolver.intDatatype(expression)
+            ) {
+                return new ImmutableTypeEvaluation(builtinSymbolResolver.intDatatype(expression));
+            }
+        }
+        diagnosticList.add(new FeatureBasedDiagnostic(
+                Diagnostic.ERROR,
+                "Unknown type",
+                expression,
+                null,
+                0,
+                CheckType.EXPENSIVE,
+                INCORRECT_TYPE_ERROR
+        ));
+        return InvalidTypeEvaluation.INSTANCE;
     }
 
     @Override
     protected TypeEvaluation visit(NegationOperator expression) {
-        return TypeEvaluation.INVALID;
+        var body = evaluate(expression.getBody());
+
+        if (body instanceof InvalidTypeEvaluation) {
+            return InvalidTypeEvaluation.INSTANCE;
+        }
+        if (
+            body instanceof ImmutableTypeEvaluation(DomainDeclaration bodydomain)
+        ) {
+            if(
+                bodydomain == builtinSymbolResolver.boolDatatype(expression)
+            ) {
+                return new ImmutableTypeEvaluation(builtinSymbolResolver.boolDatatype(expression));
+            }
+        }
+        diagnosticList.add(new FeatureBasedDiagnostic(
+                Diagnostic.ERROR,
+                "Unknown type",
+                expression,
+                null,
+                0,
+                CheckType.EXPENSIVE,
+                INCORRECT_TYPE_ERROR
+        ));
+        return InvalidTypeEvaluation.INSTANCE;
     }
 
     @Override
     protected TypeEvaluation visit(ArrayLiteral expression) {
-        return TypeEvaluation.INVALID;
+        return InvalidTypeEvaluation.INSTANCE;
     }
 
     @Override
     protected TypeEvaluation visit(LiteralInfinity expression) {
-        return TypeEvaluation.INVALID;
+        return InvalidTypeEvaluation.INSTANCE;
     }
 
     @Override
@@ -237,7 +354,10 @@ public class ExpressionTypeEvaluator extends ExpressionEvaluator<TypeEvaluation>
 
     @Override
     protected TypeEvaluation visit(LiteralNothing expression) {
-        return TypeEvaluation.INVALID;
+        // Ha nem adunk vissza errort, akkor a későbbiekben azt hiszi a rendszer, hogy mar lekezeltuk
+        // IGNORE
+        // TODO: Should be refactored with a ignored type
+        return InvalidTypeEvaluation.INSTANCE;
     }
 
     @Override
@@ -267,7 +387,7 @@ public class ExpressionTypeEvaluator extends ExpressionEvaluator<TypeEvaluation>
 
         if (classDeclaration == null) {
             // TODO: add validation diagnostic
-            return TypeEvaluation.INVALID;
+            return InvalidTypeEvaluation.INSTANCE;
         }
 
         if (classDeclaration.eIsProxy()) {
@@ -292,15 +412,24 @@ public class ExpressionTypeEvaluator extends ExpressionEvaluator<TypeEvaluation>
         };
     }
 
+    /*
+    protected TypeEvaluation visit(VariableDeclaration variableDeclaration) {
+        var type = variableDeclaration.getType();
+        if (type == null) {
+            return InvalidTypeEvaluation.INSTANCE;
+        }
+        var expressionType = visit(variableDeclaration.getExpression());
+
+    }*/
+
     @Override
     protected TypeEvaluation visit(CallSuffixExpression expression) {
         // TODO: should compute the called type, and then compute its return type
-        return TypeEvaluation.INVALID;
+        return InvalidTypeEvaluation.INSTANCE;
     }
 
     @Override
     protected TypeEvaluation visit(IndexingSuffixExpression expression) {
         return evaluate(expression.getPrimary());
     }
-
 }
