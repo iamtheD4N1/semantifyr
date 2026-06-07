@@ -9,11 +9,10 @@ package hu.bme.mit.semantifyr.oxsts.lang.validation;
 import com.google.inject.Inject;
 import hu.bme.mit.semantifyr.oxsts.lang.library.builtin.BuiltinSymbolResolver;
 import hu.bme.mit.semantifyr.oxsts.lang.naming.NamingUtil;
-import hu.bme.mit.semantifyr.oxsts.lang.semantics.typesystem.ExpressionModalityEvaluatorProvider;
+import hu.bme.mit.semantifyr.oxsts.lang.semantics.typesystem.*;
 import hu.bme.mit.semantifyr.oxsts.model.oxsts.*;
 import org.eclipse.emf.ecore.EObject;
 import org.eclipse.xtext.resource.ILocationInFileProvider;
-import hu.bme.mit.semantifyr.oxsts.lang.semantics.typesystem.ExpressionTypeEvaluatorProvider;
 import org.eclipse.emf.common.util.Diagnostic;
 import org.eclipse.xtext.validation.Check;
 
@@ -34,7 +33,11 @@ public class OxstsValidator extends AbstractOxstsValidator {
 
     private static final String ISSUE_PREFIX = "hu.bme.mit.semantifyr.oxsts.lang.validation.OxstsValidator.";
     public static final String DUPLICATE_NAME_ISSUE = ISSUE_PREFIX + "DUPLICATE_NAME";
+    public static final String DYNAMIC_INLINE_IF_GUARD_ISSUE = ISSUE_PREFIX + "DYNAMIC_INLINE_IF";
+    public static final String STATIC_IF_GUARD_ISSUE = ISSUE_PREFIX + "DYNAMIC_INLINE_IF";
     public static final String DATA_TYPE_NOT_IN_BUILTIN_ISSUE = ISSUE_PREFIX + "DATA_TYPE_NOT_IN_BUILTIN";
+    public static final String INCORRECT_MODALITY_ERROR = ISSUE_PREFIX + "INCORRECT_MODALITY";
+    public static final String INVALID_TYPE_ERROR = ISSUE_PREFIX + "INVALID_TYPE";
 
     @Inject
     protected BuiltinSymbolResolver builtinSymbolResolver;
@@ -44,6 +47,9 @@ public class OxstsValidator extends AbstractOxstsValidator {
 
     @Inject
     private ExpressionModalityEvaluatorProvider expressionModalityEvaluatorProvider;
+
+    @Inject
+    protected TypeCompatibility typeCompatibility;
 
     @Check
     public void checkTypes(OxstsModelPackage oxstsModelPackage) {
@@ -130,12 +136,13 @@ public class OxstsValidator extends AbstractOxstsValidator {
         acceptError(message, object, region.getOffset(), region.getLength(), code, issueData);
     }
 
+
     @Check
     public void ifOperationGuardMustBeBool(IfOperation ifOperation) {
         var evaluation = expressionTypeEvaluatorProvider.evaluate(ifOperation.getGuard());
 
         if (evaluation.getDomain() != builtinSymbolResolver.boolDatatype(ifOperation)) {
-            acceptError("message", ifOperation, OxstsPackage.Literals.IF_OPERATION__GUARD, 0, DUPLICATE_NAME_ISSUE);
+            acceptError("Guard is not bool", ifOperation, OxstsPackage.Literals.IF_OPERATION__GUARD, 0, INVALID_TYPE_ERROR);
         }
     }
 
@@ -144,8 +151,44 @@ public class OxstsValidator extends AbstractOxstsValidator {
         var evaluation = expressionTypeEvaluatorProvider.evaluate(inlineIfOperation.getGuard());
 
         if (evaluation.getDomain() != builtinSymbolResolver.boolDatatype(inlineIfOperation)) {
-            acceptError("message", inlineIfOperation, OxstsPackage.Literals.INLINE_IF_OPERATION__GUARD, 0, DUPLICATE_NAME_ISSUE);
+            acceptError("Guard is not bool", inlineIfOperation, OxstsPackage.Literals.INLINE_IF_OPERATION__GUARD, 0, DUPLICATE_NAME_ISSUE);
         }
     }
 
+    @Check
+    public void inlineIfGuardMustBeStatic(InlineIfOperation inlineIfOperation) {
+        var modality = expressionModalityEvaluatorProvider.evaluateExpressionModality(inlineIfOperation.getGuard());
+
+        if (modality == Modality.Dynamic) {
+            acceptError("Guard is incompatible modality", inlineIfOperation, null, 0, DYNAMIC_INLINE_IF_GUARD_ISSUE);
+        }
+    }
+
+    @Check
+    public void ifGuardShouldBeDynamic(IfOperation ifOperation) {
+        var modality = expressionModalityEvaluatorProvider.evaluateExpressionModality(ifOperation.getGuard());
+
+        if (modality != Modality.Dynamic) {
+            acceptError("This can be converted to inline if", ifOperation, null, 0, DYNAMIC_INLINE_IF_GUARD_ISSUE);
+        }
+    }
+
+    @Check
+    protected void featureDeclarationIsNotDynamic(FeatureDeclaration expression) {
+        if (expressionModalityEvaluatorProvider.evaluateExpressionModality(expression.getExpression()) == Modality.Dynamic) {
+            acceptError("Feature declaration value required to be at least static!", expression, null, 0, INCORRECT_MODALITY_ERROR);
+        }
+    }
+
+    @Check
+    public void variableDeclarationAssignmentMustBeCompatible(VariableDeclaration variableDeclaration) {
+        var type = variableDeclaration.getType();
+        if (type == null) {
+            return;
+        }
+        var expression = variableDeclaration.getExpression();
+        var expressionType = expressionTypeEvaluatorProvider.evaluate(expression);
+        if(!typeCompatibility.isAssignable(new ImmutableTypeEvaluation(type), expressionType, expression))
+            acceptError("message", variableDeclaration, DUPLICATE_NAME_ISSUE);
+    }
 }

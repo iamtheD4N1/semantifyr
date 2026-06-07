@@ -8,6 +8,8 @@ package hu.bme.mit.semantifyr.oxsts.lang.semantics.typesystem;
 
 import com.google.inject.Inject;
 import hu.bme.mit.semantifyr.oxsts.lang.library.builtin.BuiltinSymbolResolver;
+import hu.bme.mit.semantifyr.oxsts.lang.semantics.expression.ArrayEvaluation;
+import hu.bme.mit.semantifyr.oxsts.lang.semantics.expression.ExpressionEvaluation;
 import hu.bme.mit.semantifyr.oxsts.lang.semantics.expression.ExpressionEvaluator;
 import hu.bme.mit.semantifyr.oxsts.model.oxsts.*;
 import org.eclipse.emf.common.util.Diagnostic;
@@ -26,6 +28,9 @@ public class ExpressionTypeEvaluator extends ExpressionEvaluator<TypeEvaluation>
     @Inject
     protected BuiltinSymbolResolver builtinSymbolResolver;
 
+    @Inject
+    protected TypeCompatibility typeCompatibility;
+
     @Override
     protected TypeEvaluation visit(RangeExpression expression) {
         return InvalidTypeEvaluation.INSTANCE;
@@ -34,132 +39,17 @@ public class ExpressionTypeEvaluator extends ExpressionEvaluator<TypeEvaluation>
 
     private static final String INCORRECT_TYPE_ERROR = "INCORRECT_TYPE";
     private static final String INCORRECT_TYPE_ERROR_MESSAGE = "This expression contains an incompatible type";
-    private static final String CONSTANT_EXPRESSION_WARNING = "CONSTANT_EXPRESSION";
     private static final String CONSTANT_EXPRESSION_WARNING_MESSAGE = "This is a constant expression.";
-    private static final String STATIC_EXPRESSION_WARNING = "STATIC_EXPRESSION";
-    private static final String STATIC_EXPRESSION_WARNING_MESSAGE = "This evaulation always has the same result.";
 
     private final List<FeatureBasedDiagnostic> diagnosticList = new ArrayList<>();
 
     public List<FeatureBasedDiagnostic> checkTypes(OxstsModelPackage oxstsModelPackage) {
-        var assignments = EcoreUtil2.eAllOfType(oxstsModelPackage, AssignmentOperation.class);
-        var variables = EcoreUtil2.eAllOfType(oxstsModelPackage, VariableDeclaration.class);
         var expressions = EcoreUtil2.eAllOfType(oxstsModelPackage, Expression.class);
-
-        for (var var : variables) {
-            checkVariable(var);
-        }
-        for (var ass : assignments) {
-            checkAssigsment(ass);
-        }
         for (var expr : expressions) {
             evaluate(expr);
         }
-        /*
-        for(var key : expressionEvalTypeMap.keySet()){
-            var type = expressionEvalTypeMap.get(key);
-            if(type.modality == Modality.Constant && !(key instanceof LiteralExpression))
-                diagnosticList.add(new FeatureBasedDiagnostic(
-                        Diagnostic.WARNING,
-                        CONSTANT_EXPRESSION_WARNING_MESSAGE,
-                        key,
-                        null,
-                        0,
-                        CheckType.EXPENSIVE,
-                        CONSTANT_EXPRESSION_WARNING
-                ));
-            else if(type.modality == Modality.Static){
-                diagnosticList.add(new FeatureBasedDiagnostic(
-                        Diagnostic.WARNING,
-                        STATIC_EXPRESSION_WARNING_MESSAGE,
-                        key,
-                        null,
-                        0,
-                        CheckType.EXPENSIVE,
-                        STATIC_EXPRESSION_WARNING
-                ));
-            }
-        }
-        */
+
         return diagnosticList;
-    }
-
-    private void checkAssigsment(AssignmentOperation assignmentOperation) {
-        /*var expression = assignmentOperation.getExpression();
-        var exprType = evaluateType(expression);
-        var varType = evaluateType(assignmentOperation.getReference());
-        var variable = assignmentOperation.getReference().getChains().getLast().getElement();
-        variableEvalTypeMap.get(variable).modality = Modality.Dynamic;
-
-        switch (varType) {
-            case IntegerDataType integerDataType:
-                expectType(expression, exprType, IntegerDataType.class);
-                return;
-            case BooleanDataType booleanDataType:
-                expectType(expression, exprType, BooleanDataType.class);
-                return;
-            default:
-                diagnosticList.add(new FeatureBasedDiagnostic(
-                        Diagnostic.ERROR,
-                        "Unknown type",
-                        expression,
-                        null,
-                        0,
-                        CheckType.EXPENSIVE,
-                        INCORRECT_TYPE_ERROR
-                ));
-        }*/
-    }
-
-    private void checkVariable(VariableDeclaration variable) {
-        /*
-        var expression = variable.getExpression();
-        var varType = variable.getTyping();
-
-        if (expression == null) {
-            switch (varType) {
-                case IntegerType integerType:
-                    variableEvalTypeMap.put(variable, new IntegerDataType(Modality.Constant));
-                    return;
-                case BooleanType booleanType:
-                    variableEvalTypeMap.put(variable, new BooleanDataType(Modality.Constant));
-                    return;
-                default:
-                    diagnosticList.add(new FeatureBasedDiagnostic(
-                            Diagnostic.ERROR,
-                            "Unknown type",
-                            variable,
-                            null,
-                            0,
-                            CheckType.EXPENSIVE,
-                            INCORRECT_TYPE_ERROR
-                    ));
-            }
-        };
-
-        var exprType = evaluateType(expression);
-
-        switch (varType) {
-            case IntegerType integerType:
-                expectType(expression, exprType, IntegerDataType.class);
-                variableEvalTypeMap.put(variable, exprType);
-                return;
-            case BooleanType booleanType:
-                expectType(expression, exprType, BooleanDataType.class);
-                variableEvalTypeMap.put(variable, exprType);
-                return;
-            default:
-                diagnosticList.add(new FeatureBasedDiagnostic(
-                        Diagnostic.ERROR,
-                        "Unknown type",
-                        expression,
-                        null,
-                        0,
-                        CheckType.EXPENSIVE,
-                        INCORRECT_TYPE_ERROR
-                ));
-        }
-         */
     }
 
     @Override
@@ -173,15 +63,25 @@ public class ExpressionTypeEvaluator extends ExpressionEvaluator<TypeEvaluation>
         if (right instanceof InvalidTypeEvaluation) {
             return InvalidTypeEvaluation.INSTANCE;
         }
-        if (
-            left instanceof ImmutableTypeEvaluation(DomainDeclaration leftdomain)
-            && right instanceof ImmutableTypeEvaluation(DomainDeclaration rightdomain)
-        ) {
-            if(
-                leftdomain == builtinSymbolResolver.intDatatype(expression)
-                && rightdomain == builtinSymbolResolver.intDatatype(expression)
-            ) {
+
+        if (expression.getOp() == ComparisonOp.EQ ||
+            expression.getOp() == ComparisonOp.NOT_EQ) {
+            if (typeCompatibility.isAssignable(left, right, expression)
+                    || typeCompatibility.isAssignable(right, left, expression)) {
                 return new ImmutableTypeEvaluation(builtinSymbolResolver.boolDatatype(expression));
+            }
+        }
+        else {
+            if (
+                left instanceof ImmutableTypeEvaluation(DomainDeclaration leftdomain)
+                && right instanceof ImmutableTypeEvaluation(DomainDeclaration rightdomain)
+            ) {
+                if(
+                    leftdomain == builtinSymbolResolver.intDatatype(expression)
+                    && rightdomain == builtinSymbolResolver.intDatatype(expression)
+                ) {
+                    return new ImmutableTypeEvaluation(builtinSymbolResolver.boolDatatype(expression));
+                }
             }
         }
         diagnosticList.add(new FeatureBasedDiagnostic(
@@ -234,8 +134,6 @@ public class ExpressionTypeEvaluator extends ExpressionEvaluator<TypeEvaluation>
     protected TypeEvaluation visit(BooleanOperator expression) {
         var left = evaluate(expression.getLeft());
         var right = evaluate(expression.getRight());
-
-        // isBinaryOperatorLegal(expression.getOp(), left, right);
 
         if (left instanceof InvalidTypeEvaluation) {
             return InvalidTypeEvaluation.INSTANCE;
@@ -324,7 +222,22 @@ public class ExpressionTypeEvaluator extends ExpressionEvaluator<TypeEvaluation>
 
     @Override
     protected TypeEvaluation visit(ArrayLiteral expression) {
-        return InvalidTypeEvaluation.INSTANCE;
+        TypeEvaluation elementType = visit(expression.getValues().getFirst());
+        for (var element : expression.getValues()) {
+            if (!typeCompatibility.isAssignable(visit(element), elementType, expression)) {
+                diagnosticList.add(new FeatureBasedDiagnostic(
+                        Diagnostic.ERROR,
+                        "Elements incompatible",
+                        element,
+                        null,
+                        0,
+                        CheckType.EXPENSIVE,
+                        INCORRECT_TYPE_ERROR
+                ));
+                return InvalidTypeEvaluation.INSTANCE;
+            }
+        }
+        return new ArrayTypeEvaluation(elementType);
     }
 
     @Override
@@ -411,16 +324,6 @@ public class ExpressionTypeEvaluator extends ExpressionEvaluator<TypeEvaluation>
             default -> throw new IllegalStateException("Unexpected value: " + member);
         };
     }
-
-    /*
-    protected TypeEvaluation visit(VariableDeclaration variableDeclaration) {
-        var type = variableDeclaration.getType();
-        if (type == null) {
-            return InvalidTypeEvaluation.INSTANCE;
-        }
-        var expressionType = visit(variableDeclaration.getExpression());
-
-    }*/
 
     @Override
     protected TypeEvaluation visit(CallSuffixExpression expression) {

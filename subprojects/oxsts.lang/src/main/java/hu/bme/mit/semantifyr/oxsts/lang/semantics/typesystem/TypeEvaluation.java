@@ -8,7 +8,7 @@ package hu.bme.mit.semantifyr.oxsts.lang.semantics.typesystem;
 
 import hu.bme.mit.semantifyr.oxsts.model.oxsts.DomainDeclaration;
 
-public sealed interface TypeEvaluation permits ImmutableTypeEvaluation, InvalidTypeEvaluation {
+public sealed interface TypeEvaluation permits ImmutableTypeEvaluation, InvalidTypeEvaluation, ArrayTypeEvaluation {
 
     default DomainDeclaration getDomain() {
         return null;
